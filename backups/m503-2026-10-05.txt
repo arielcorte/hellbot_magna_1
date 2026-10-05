@@ -1,0 +1,23 @@
+echo:  G21    ; Units in mm
+echo:  M149 C ; Units in Celsius
+
+echo:Filament settings: Disabled
+echo:  M200 D1.75
+echo:  M200 D0
+echo:Steps per unit:
+echo:  M92 X80.30 Y80.80 Z400.00 E93.00
+echo:Maximum feedrates (units/s):
+echo:  M203 X400.00 Y400.00 Z400.00 E45.00
+echo:Maximum Acceleration (units/s2):
+echo:  M201 X1000 Y1000 Z50 E1000
+echo:Acceleration (units/s2): P<print_accel> R<retract_accel> T<travel_accel>
+echo:  M204 P1000.00 R2000.00 T1000.00
+echo:Advanced: S<min_feedrate> T<min_travel_feedrate> B<min_segment_time_us> X<max_xy_jerk> Z<max_z_jerk> E<max_e_jerk>
+echo:  M205 S0.00 T0.00 B20000 X10.00 Y10.00 Z0.40 E5.00
+echo:Material heatup parameters:
+echo:  M145 S0 H215 B60 F0
+echo:  M145 S1 H235 B90 F0
+echo:PID settings:
+echo:  M301 P26.26 I5.17 D33.35
+echo:  M304 P182.46 I35.92 D231.70
+ok
