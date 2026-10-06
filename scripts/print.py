@@ -10,6 +10,7 @@ Usage: python scripts/print.py FILE.gcode [--port /dev/ttyUSB0]
 import argparse
 import fcntl
 import os
+import re
 import select
 import signal
 import struct
@@ -26,6 +27,14 @@ TCSETS2 = 0x402C542B
 BOTHER = 0o010000
 CBAUD = 0o010017
 TERMIOS2 = "4IB19s2I"
+
+# "ok" can arrive glued to another message (e.g. "echo:enok"), so don't
+# require it at the start of the line.
+OK = re.compile(r"^ok|ok( [TB]:|$)")
+# If the printer says nothing for this long, assume a reply was lost and
+# resend the current line. Marlin prints temperatures every second while
+# heating, so silence this long means something went missing.
+SILENCE_RESEND = 30
 
 
 class Port:
@@ -110,12 +119,18 @@ def main():
     n = 0
     last_report = 0
     start = time.time()
+    last_heard = time.time()
 
     while True:
         resp = ser.readline().decode(errors="replace").strip()
         if not resp:
+            if time.time() - last_heard > SILENCE_RESEND:
+                print(f"no reply for {SILENCE_RESEND}s, resending line {n}", flush=True)
+                send(n, sent[n] if n else "M110 N0")
+                last_heard = time.time()
             continue
-        if resp.startswith("ok"):
+        last_heard = time.time()
+        if OK.search(resp):
             n += 1
             if n > total:
                 break
@@ -140,7 +155,7 @@ def main():
     ser.write(b"M400\n")
     deadline = time.time() + 600
     while time.time() < deadline:
-        if ser.readline().decode(errors="replace").strip().startswith("ok"):
+        if OK.search(ser.readline().decode(errors="replace").strip()):
             break
     print("Done.", flush=True)
 
