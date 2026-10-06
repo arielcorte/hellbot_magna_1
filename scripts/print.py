@@ -8,23 +8,43 @@ Usage: python scripts/print.py FILE.gcode [--port /dev/ttyUSB0]
 """
 
 import argparse
+import fcntl
 import os
 import select
 import signal
-import subprocess
+import struct
 import sys
+import termios
 import time
 
 BAUD = 250000
 
+# Linux termios2 interface for non-standard baud rates (x86_64/arm64 values).
+# pyserial fails at 250000 here and older stty versions reject it.
+TCGETS2 = 0x802C542A
+TCSETS2 = 0x402C542B
+BOTHER = 0o010000
+CBAUD = 0o010017
+TERMIOS2 = "4IB19s2I"
+
 
 class Port:
-    """Minimal serial port. pyserial can't set 250000 baud here, stty can."""
+    """Minimal raw serial port at BAUD."""
 
     def __init__(self, path):
-        subprocess.run(["stty", "-F", path, str(BAUD), "raw", "-echo", "-hupcl"], check=True)
         self.fd = os.open(path, os.O_RDWR | os.O_NOCTTY)
         self.buf = b""
+        buf = fcntl.ioctl(self.fd, TCGETS2, bytes(struct.calcsize(TERMIOS2)))
+        _, _, cflag, _, line, cc, _, _ = struct.unpack(TERMIOS2, buf)
+        # Raw 8N1, no hangup on close (so closing doesn't reset the board).
+        cflag &= ~(CBAUD | termios.CSIZE | termios.PARENB | termios.CSTOPB
+                   | termios.CRTSCTS | termios.HUPCL)
+        cflag |= BOTHER | termios.CS8 | termios.CREAD | termios.CLOCAL
+        cc = bytearray(cc)
+        cc[termios.VMIN] = 0
+        cc[termios.VTIME] = 0
+        fcntl.ioctl(self.fd, TCSETS2,
+                    struct.pack(TERMIOS2, 0, 0, cflag, 0, line, bytes(cc), BAUD, BAUD))
 
     def write(self, data):
         os.write(self.fd, data)
